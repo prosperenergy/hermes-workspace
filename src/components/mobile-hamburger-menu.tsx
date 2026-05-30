@@ -43,6 +43,13 @@ export const MOBILE_HAMBURGER_NAV_ITEMS = [
     match: (p: string) => p.startsWith('/dashboard'),
   },
   {
+    id: 'prosper',
+    label: 'Prosper OS',
+    icon: Rocket01Icon,
+    to: '/prosper',
+    match: (p: string) => p.startsWith('/prosper'),
+  },
+  {
     id: 'playground',
     label: 'HermesWorld',
     icon: Castle02Icon,

@@ -61,6 +61,13 @@ export const MOBILE_NAV_TABS: Array<TabItem> = [
     match: (p) => p.startsWith('/chat') || p === '/new',
   },
   {
+    id: 'prosper',
+    label: 'Prosper',
+    icon: Rocket01Icon,
+    to: '/prosper',
+    match: (p) => p.startsWith('/prosper'),
+  },
+  {
     id: 'playground',
     label: 'Play',
     icon: Rocket01Icon,

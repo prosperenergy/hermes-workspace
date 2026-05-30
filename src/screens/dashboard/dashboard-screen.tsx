@@ -33,6 +33,7 @@ import { LogsTailCard } from './components/logs-tail-card'
 import { OperatorTipCard } from './components/operator-tip-card'
 import { OpsStrip } from './components/ops-strip'
 import { ProviderMixCard } from './components/provider-mix-card'
+import { ProsperCommandCard } from './components/prosper-command-card'
 import { SessionsIntelligenceCard } from './components/sessions-intelligence-card'
 import { SkillsUsageCard } from './components/skills-usage-card'
 import { TokenMixHourCard } from './components/token-mix-hour-card'
@@ -820,6 +821,43 @@ export function DashboardScreen() {
     refetchInterval: 30_000,
   })
   const overview = overviewQuery.data ?? null
+  const prosperCockpitQuery = useQuery({
+    queryKey: ['prosper-cockpit'],
+    queryFn: async () => {
+      const res = await fetch('/api/prosper-cockpit')
+      if (!res.ok) throw new Error(`Prosper cockpit unavailable (${res.status})`)
+      return (await res.json()) as {
+        ok: boolean
+        models?: {
+          ok: boolean
+          count: number
+          sample: Array<string>
+          error: string | null
+        }
+        agents?: {
+          updatedAt: string | null
+          agents: Array<{
+            id: string
+            provider: string
+            modelId: string
+            model: string
+            fallbacks?: Array<{
+              model: string
+              modelId: string
+              provider: string
+            }>
+          }>
+        }
+        actions?: Array<{
+          id: string
+          label: string
+          prompt: string
+        }>
+      }
+    },
+    staleTime: 20_000,
+    refetchInterval: 30_000,
+  })
 
   const palette = useDashboardPalette()
 
@@ -899,8 +937,8 @@ export function DashboardScreen() {
             }}
           >
             <img
-              src="/claude-avatar.webp"
-              alt="Hermes Workspace logo"
+              src="/logo-icon.png"
+              alt="PROSPER OS logo"
               className="size-8 rounded-md"
               style={{ background: 'transparent' }}
             />
@@ -920,7 +958,7 @@ export function DashboardScreen() {
                 lineHeight: 1.1,
               }}
             >
-              Hermes Workspace
+              PROSPER OS
             </h1>
           </div>
         </div>
@@ -1033,6 +1071,11 @@ export function DashboardScreen() {
         status={overview?.status ?? null}
         cron={overview?.cron ?? null}
         platforms={overview?.platforms ?? []}
+      />
+
+      <ProsperCommandCard
+        data={prosperCockpitQuery.data ?? null}
+        navigate={navigate}
       />
 
       {/* ── Hero Metrics: 3 analytics tiles + Active Model KPI in slot 4 ── */}

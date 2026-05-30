@@ -95,15 +95,16 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const getTabIndex = useCallback((path: string): number => {
     if (path === '/dashboard') return 0
     if (path.startsWith('/chat') || path === '/new' || path === '/') return 1
-    if (path.startsWith('/files')) return 2
-    if (path.startsWith('/terminal')) return 3
-    if (path.startsWith('/jobs')) return 4
-    if (path === '/swarm' || path.startsWith('/swarm2')) return 5
-    if (path.startsWith('/memory')) return 6
-    if (path.startsWith('/skills')) return 7
-    if (path.startsWith('/mcp')) return 8
-    if (path.startsWith('/profiles')) return 9
-    if (path.startsWith('/settings')) return 10
+    if (path.startsWith('/prosper')) return 2
+    if (path.startsWith('/files')) return 3
+    if (path.startsWith('/terminal')) return 4
+    if (path.startsWith('/jobs')) return 5
+    if (path === '/swarm' || path.startsWith('/swarm2')) return 6
+    if (path.startsWith('/memory')) return 7
+    if (path.startsWith('/skills')) return 8
+    if (path.startsWith('/mcp')) return 9
+    if (path.startsWith('/profiles')) return 10
+    if (path.startsWith('/settings')) return 11
     return -1
   }, [])
 
@@ -168,6 +169,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   // Derive active session from URL
   const mobilePageTitle = (() => {
     if (pathname.startsWith('/terminal')) return 'Terminal'
+    if (pathname.startsWith('/prosper')) return 'Prosper OS'
     if (pathname.startsWith('/files')) return 'Files'
     if (pathname.startsWith('/jobs')) return 'Jobs'
     if (pathname.startsWith('/conductor')) return 'Conductor'

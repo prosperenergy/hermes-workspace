@@ -582,12 +582,13 @@ function ChatSidebarComponent({
   const isAgoraActive = pathname === '/agora'
   const isTerminalActive = pathname === '/terminal'
   const isJobsActive = pathname === '/jobs'
+  const isProsperActive = pathname === '/prosper'
   const isMemoryActive = pathname === '/memory'
   const isTasksActive = pathname === '/tasks'
   const isConductorActive = pathname === '/conductor'
   const isOperationsActive = pathname === '/operations'
   const isSwarmActive = pathname === '/swarm' || pathname === '/swarm2'
-  const mainRoutes = ['/chat', '/new', '/files', '/terminal']
+  const mainRoutes = ['/chat', '/new', '/prosper', '/files', '/terminal']
   const knowledgeRoutes = ['/memory', '/skills']
   const systemRoutes = ['/settings', '/logs']
 
@@ -794,6 +795,13 @@ function ChatSidebarComponent({
       icon: MessageMultiple01Icon,
       label: t('nav.chat'),
       active: isChatActive,
+    },
+    {
+      kind: 'link',
+      to: '/prosper',
+      icon: Rocket01Icon,
+      label: 'Prosper OS',
+      active: isProsperActive,
     },
 
     {

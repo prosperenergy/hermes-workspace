@@ -16,6 +16,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "smoke:managed": "node scripts/managed-companion-smoke.mjs",
+    "prosper:worker": "node scripts/prosper-os-redis-worker.mjs",
+    "prosper:worker:once": "node scripts/prosper-os-redis-worker.mjs --once",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",
     "format": "prettier",
