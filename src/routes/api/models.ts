@@ -12,13 +12,20 @@ import {
 import { BEARER_TOKEN, CLAUDE_API } from '../../server/gateway-capabilities'
 import {
   ensureDiscovery,
-  getDiscoveredModels,
   ensureProviderInConfig,
+  getDiscoveredModels,
 } from '../../server/local-provider-discovery'
 
 const CLAUDE_HOME = process.env.HERMES_HOME ?? process.env.CLAUDE_HOME ?? path.join(os.homedir(), '.hermes')
 const MODELS_PATH = path.join(CLAUDE_HOME, 'models.json')
 const CONFIG_PATH = path.join(CLAUDE_HOME, 'config.yaml')
+const MODELS_CACHE_TTL_MS = 30_000
+const CPAMC_BASE_URL =
+  process.env.CPAMC_BASE_URL?.trim() ||
+  process.env.CLI_PROXY_API_BASE_URL?.trim() ||
+  'http://127.0.0.1:8317/v1'
+const CPAMC_API_KEY =
+  process.env.CPAMC_API_KEY?.trim() || 'prosper-sam-2026'
 
 type ModelEntry = {
   provider?: string
@@ -26,6 +33,32 @@ type ModelEntry = {
   name?: string
   [key: string]: unknown
 }
+
+const UNSUPPORTED_CPAMC_MODEL_IDS = new Set([
+  'gemini-3-pro-image-preview',
+  'gemini-3.1-flash-image-preview',
+  'imagen-3.0-fast-generate-001',
+  'imagen-3.0-generate-002',
+  'imagen-4.0-fast-generate-001',
+  'imagen-4.0-generate-001',
+  'imagen-4.0-ultra-generate-001',
+  'nvidia/llama-3.3-nemotron-super-49b-v1',
+  'qwen/qwen3-coder-480b-a35b-instruct',
+  'vertex/gemini-3-pro-image-preview',
+  'vertex/gemini-3.1-flash-image-preview',
+  'vertex/imagen-3.0-fast-generate-001',
+  'vertex/imagen-3.0-generate-002',
+  'vertex/imagen-4.0-fast-generate-001',
+  'vertex/imagen-4.0-generate-001',
+  'vertex/imagen-4.0-ultra-generate-001',
+])
+
+let modelsResponseCache:
+  | {
+      expiresAt: number
+      payload: Record<string, unknown>
+    }
+  | null = null
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (value && typeof value === 'object' && !Array.isArray(value))
@@ -35,6 +68,18 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function readString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+function shouldBypassModelsCache(request: Request): boolean {
+  try {
+    const url = new URL(request.url)
+    return (
+      url.searchParams.get('refresh') === '1' ||
+      url.searchParams.get('cache') === '0'
+    )
+  } catch {
+    return false
+  }
 }
 
 function normalizeModel(entry: unknown): ModelEntry | null {
@@ -189,6 +234,26 @@ async function fetchClaudeModels(): Promise<Array<ModelEntry>> {
     .filter((e): e is ModelEntry => e !== null)
 }
 
+async function fetchCpamcModels(): Promise<Array<ModelEntry>> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (CPAMC_API_KEY) headers.Authorization = `Bearer ${CPAMC_API_KEY}`
+  const response = await fetch(`${CPAMC_BASE_URL.replace(/\/+$/, '')}/models`, {
+    headers,
+    signal: AbortSignal.timeout(8_000),
+  })
+  if (!response.ok)
+    throw new Error(`CPAMC models request failed (${response.status})`)
+  const payload = asRecord(await response.json())
+  const rawModels = Array.isArray(payload.data)
+    ? payload.data
+    : Array.isArray(payload.models)
+      ? payload.models
+      : []
+  return rawModels
+    .map(normalizeModel)
+    .filter((entry): entry is ModelEntry => entry !== null)
+}
+
 export const Route = createFileRoute('/api/models')({
   server: {
     handlers: {
@@ -196,6 +261,20 @@ export const Route = createFileRoute('/api/models')({
         if (!isAuthenticated(request)) {
           return json({ ok: false, error: 'Unauthorized' }, { status: 401 })
         }
+
+        const bypassCache = shouldBypassModelsCache(request)
+        if (
+          !bypassCache &&
+          modelsResponseCache &&
+          Date.now() < modelsResponseCache.expiresAt
+        ) {
+          return json({
+            ...modelsResponseCache.payload,
+            cached: true,
+            cacheTtlMs: MODELS_CACHE_TTL_MS,
+          })
+        }
+
         await ensureGatewayProbed()
 
         try {
@@ -215,9 +294,27 @@ export const Route = createFileRoute('/api/models')({
           // Operations picker only showed the local Workspace subset and drifted
           // from the CLI/backend model universe.
           if (getGatewayCapabilities().models) {
-            const hermesModels = await fetchClaudeModels()
-            models = mergeModelEntries(models, hermesModels)
-            source = source === 'models.json' ? 'models.json+hermes-agent' : 'hermes-agent'
+            try {
+              const hermesModels = await fetchClaudeModels()
+              models = mergeModelEntries(models, hermesModels)
+              source =
+                source === 'models.json'
+                  ? 'models.json+hermes-agent'
+                  : 'hermes-agent'
+            } catch {
+              // Hermes Agent can be gated after a desktop reboot or token expiry.
+              // Keep the CPAMC and local model catalog available.
+            }
+          }
+
+          try {
+            const cpamcModels = await fetchCpamcModels()
+            if (cpamcModels.length > 0) {
+              models = mergeModelEntries(models, cpamcModels)
+              source = `${source}+cpamc`
+            }
+          } catch {
+            // Keep profile/local models visible if CPAMC is temporarily down.
           }
 
           // Merge auto-discovered local models (Ollama, Atomic Chat, etc.)
@@ -239,15 +336,32 @@ export const Route = createFileRoute('/api/models')({
           )
 
           const streamTimeouts = readStreamTimeouts()
+          const unsupportedModels = models.filter((model) =>
+            UNSUPPORTED_CPAMC_MODEL_IDS.has(readString(model.id)),
+          )
+          models = models.filter(
+            (model) => !UNSUPPORTED_CPAMC_MODEL_IDS.has(readString(model.id)),
+          )
 
-          return json({
+          const payload = {
             ok: true,
             object: 'list',
             data: models,
             models,
+            unsupportedModels,
             configuredProviders,
             source,
             ...streamTimeouts,
+          }
+          modelsResponseCache = {
+            expiresAt: Date.now() + MODELS_CACHE_TTL_MS,
+            payload,
+          }
+
+          return json({
+            ...payload,
+            cached: false,
+            cacheTtlMs: MODELS_CACHE_TTL_MS,
           })
         } catch (err) {
           return json(
