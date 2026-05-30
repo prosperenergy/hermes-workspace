@@ -426,8 +426,8 @@ export const Route = createFileRoute('/api/send-stream')({
             const sendEvent = (event: string, data: unknown) => {
               if (streamClosed) return
               lastClientEventAt = Date.now()
-              const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
-              enqueueRaw(payload)
+              const eventPayload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
+              enqueueRaw(eventPayload)
             }
 
             // Cloudflare Tunnel/Access can otherwise leave small SSE streams idle
@@ -461,10 +461,6 @@ export const Route = createFileRoute('/api/send-stream')({
               if (streamTimeoutTimer) {
                 clearTimeout(streamTimeoutTimer)
                 streamTimeoutTimer = null
-              }
-              if (heartbeatTimer) {
-                clearInterval(heartbeatTimer)
-                heartbeatTimer = null
               }
               if (activeRunId) {
                 unregisterActiveSendRun(activeRunId)
