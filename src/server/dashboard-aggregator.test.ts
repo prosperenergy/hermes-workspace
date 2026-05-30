@@ -416,6 +416,21 @@ describe('buildDashboardOverview', () => {
     expect(overview.logs?.warnCount).toBe(1)
   })
 
+  it('does not surface transient Telegram polling handoffs as log incidents', async () => {
+    const fetcher = makeFetcher({
+      '/api/logs': {
+        file: 'agent',
+        lines: [
+          'WARNING gateway.platforms.telegram: [Telegram] Telegram polling conflict (1/5) — previous session still held open on Telegram servers. Waiting 20s for it to expire. Error: Conflict: terminated by other getUpdates request\n',
+        ],
+      },
+    })
+    const overview = await buildDashboardOverview({ fetcher, logsLimit: 10 })
+    expect(overview.logs?.errorCount).toBe(0)
+    expect(overview.logs?.warnCount).toBe(0)
+    expect(overview.incidents).toEqual([])
+  })
+
   it('survives mixed-status inputs (some succeed, some fail)', async () => {
     const fetcher: DashboardFetcher = async (path) => {
       if (path.startsWith('/api/status')) {

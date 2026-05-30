@@ -119,12 +119,20 @@ export async function buildRequestBody(
     options.model && options.model !== 'default'
       ? options.model
       : await getDefaultModel()
-  return {
+  const body: OpenAIChatRequest = {
     model,
     messages,
     stream: options.stream === true,
-    temperature: options.temperature,
   }
+  if (typeof options.temperature === 'number' && acceptsTemperature(model)) {
+    body.temperature = options.temperature
+  }
+  return body
+}
+
+function acceptsTemperature(model: string): boolean {
+  const normalized = model.toLowerCase()
+  return !/(^|[/])claude-opus-4([-_/]|$)/.test(normalized)
 }
 
 export type StreamChunkType =

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { openaiChat, parseOpenAIStream } from './openai-compat-api'
+import { buildRequestBody, openaiChat, parseOpenAIStream } from './openai-compat-api'
 
 function createStreamResponse(chunks: string[]): Response {
   const encoder = new TextEncoder()
@@ -72,6 +72,33 @@ describe('openaiChat', () => {
     expect(headers.Authorization).toBeUndefined()
     expect(headers['X-Hermes-Session-Id']).toBe('workspace-session-2')
     expect(headers['X-Claude-Session-Id']).toBe('workspace-session-2')
+  })
+})
+
+describe('buildRequestBody', () => {
+  it('omits temperature for Claude Opus 4 models that reject it', async () => {
+    await expect(
+      buildRequestBody([{ role: 'user', content: 'hello' }], {
+        model: 'claude-opus-4-8',
+        temperature: 0,
+      }),
+    ).resolves.not.toHaveProperty('temperature')
+
+    await expect(
+      buildRequestBody([{ role: 'user', content: 'hello' }], {
+        model: 'anthropic/claude-opus-4-8',
+        temperature: 0.2,
+      }),
+    ).resolves.not.toHaveProperty('temperature')
+  })
+
+  it('keeps temperature for models that still accept it', async () => {
+    await expect(
+      buildRequestBody([{ role: 'user', content: 'hello' }], {
+        model: 'gpt-5.5',
+        temperature: 0,
+      }),
+    ).resolves.toMatchObject({ temperature: 0 })
   })
 })
 

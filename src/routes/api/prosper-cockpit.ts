@@ -170,6 +170,17 @@ function includesAny(text: string, terms: Array<string>): boolean {
   return terms.some((term) => text.includes(term))
 }
 
+function explicitlyNamesAgent(
+  text: string,
+  agentId: string,
+  aliases: Array<string> = [],
+): boolean {
+  return [agentId, ...aliases].some((name) => {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    return new RegExp(`(^|\\b)(ask\\s+)?${escaped}(\\b|:|,)`, 'i').test(text)
+  })
+}
+
 function pickAgent(intent: string, agents: Array<ProsperAgentPin>): {
   agent: ProsperAgentPin | null
   reason: string
@@ -177,6 +188,30 @@ function pickAgent(intent: string, agents: Array<ProsperAgentPin>): {
 } {
   const text = intent.toLowerCase()
   const byId = new Map(agents.map((agent) => [agent.id.toLowerCase(), agent]))
+
+  const explicitAgents: Array<{
+    id: string
+    aliases?: Array<string>
+    mode: RoutedIntent['mode']
+  }> = [
+    { id: 'sam', mode: 'execute' },
+    { id: 'hanna', mode: 'research' },
+    { id: 'burtha', mode: 'diagnose' },
+    { id: 'kayla', aliases: ['kayley', 'k'], mode: 'draft' },
+    { id: 'maddi', aliases: ['maddy'], mode: 'execute' },
+    { id: 'oma', mode: 'research' },
+  ]
+  for (const { id, aliases, mode } of explicitAgents) {
+    if (explicitlyNamesAgent(text, id, aliases)) {
+      return {
+        agent: byId.get(id) ?? byId.get('sam') ?? null,
+        reason: `explicit ${id} request`,
+        mode: includesAny(text, ['build', 'fix', 'wire', 'make it', 'execute'])
+          ? 'execute'
+          : mode,
+      }
+    }
+  }
 
   if (
     includesAny(text, [

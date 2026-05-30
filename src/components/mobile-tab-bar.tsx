@@ -26,8 +26,8 @@ import { cn } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 import { useSettings } from '@/hooks/use-settings'
 
-/** Height constant for consistent bottom insets on mobile routes with tab bar */
-export const MOBILE_TAB_BAR_OFFSET = 'var(--tabbar-h, 80px)'
+/** Bottom tab bar is disabled; keep the exported offset at zero for composers. */
+export const MOBILE_TAB_BAR_OFFSET = '0px'
 
 /**
  * Z-index layer map (documented for maintainability):

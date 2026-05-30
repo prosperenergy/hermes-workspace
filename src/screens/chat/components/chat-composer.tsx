@@ -209,12 +209,6 @@ type ClaudeProviderOption = {
   authenticated: boolean
 }
 
-type ClaudeAvailableModelsResponse = {
-  provider: string
-  models: Array<{ id: string; description: string }>
-  providers: Array<ClaudeProviderOption>
-}
-
 type InstalledSkillSummary = {
   id: string
   name: string
@@ -331,22 +325,28 @@ async function fetchModelsForProvider(
   const normalizedProvider = provider.trim()
   if (!normalizedProvider) return []
 
-  const response = await fetch(
-    `/api/claude-proxy/api/available-models?provider=${encodeURIComponent(normalizedProvider)}`,
+  const catalog = await fetchModels()
+  return (catalog.models || []).filter((model) =>
+    modelMatchesProvider(normalizedProvider, model),
   )
-  if (!response.ok) {
-    throw new Error(`Hermes models request failed (${response.status})`)
-  }
-
-  const payload = (await response.json()) as ClaudeAvailableModelsResponse
-  return payload.models.map((model) => ({
-    id: model.id,
-    name: model.id,
-    provider: normalizedProvider,
-  }))
 }
 
 const LOCAL_PROVIDERS_SET = new Set(['ollama', 'atomic-chat'])
+
+function modelMatchesProvider(provider: string, model: ModelCatalogEntry): boolean {
+  const wanted = provider.toLowerCase()
+  const id = model.id.toLowerCase()
+  const modelProvider = String(model.provider || '').toLowerCase()
+  if (!wanted) return true
+  if (modelProvider === wanted) return true
+  if (wanted === 'openai') return id.startsWith('gpt-') || id.includes('codex')
+  if (wanted === 'anthropic') return id.includes('claude-')
+  if (wanted === 'xai') return id.startsWith('grok-')
+  if (wanted === 'gemini') return id.startsWith('gemini-') || id.startsWith('gemini-api-')
+  if (wanted === 'vertex') return id.startsWith('vertex/')
+  if (wanted === 'nvidia') return id.startsWith('llama-') || id.startsWith('nemotron-') || id.startsWith('nvidia/')
+  return id.startsWith(`${wanted}-`) || id.includes(`${wanted}/`)
+}
 
 async function switchModel(
   model: string,

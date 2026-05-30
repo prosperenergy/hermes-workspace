@@ -1,5 +1,5 @@
 /**
- * Resolve a roster `model:` display string (e.g. "Opus 4.7", "GPT-5.5",
+ * Resolve a roster `model:` display string (e.g. "Opus 4.8", "GPT-5.5",
  * "PC1 Coder") into the concrete `provider` + `default` model id pair
  * that Hermes Agent's `config.yaml` expects.
  *
@@ -30,8 +30,11 @@ export function resolveSwarmModelLabel(
   if (!normalized || normalized === 'worker') return null
 
   // Anthropic Claude family
+  if (/^opus\s*4\.8$|^claude\s*opus\s*4\.8$/.test(normalized)) {
+    return { provider: 'anthropic-oauth', default: 'claude-opus-4-8' }
+  }
   if (/^opus\s*4\.7$|^claude\s*opus\s*4\.7$/.test(normalized)) {
-    return { provider: 'anthropic-oauth', default: 'claude-opus-4-7' }
+    return { provider: 'anthropic-oauth', default: 'claude-opus-4-8' }
   }
   if (/^opus\s*4\.6$|^claude\s*opus\s*4\.6$/.test(normalized)) {
     return { provider: 'anthropic-oauth', default: 'claude-opus-4-6' }

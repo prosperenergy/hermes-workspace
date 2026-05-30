@@ -643,6 +643,7 @@ function displayTaskTitle(runtime: RuntimeEntry | undefined, fallback: string): 
 
 function formatAssignedModel(model?: string | null, provider?: string | null): string {
   const value = `${model || ''} ${provider || ''}`.toLowerCase()
+  if (value.includes('claude-opus-4-8') || value.includes('opus-4-8')) return 'Opus 4.8'
   if (value.includes('claude-opus-4-7') || value.includes('opus-4-7')) return 'Opus 4.7'
   if (value.includes('claude-opus-4-6') || value.includes('opus-4-6')) return 'Opus 4.6'
   if (value.includes('gpt-5.5')) return 'GPT-5.5'

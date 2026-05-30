@@ -10,9 +10,13 @@ describe('resolveSwarmModelLabel', () => {
   })
 
   it('resolves Anthropic Opus labels', () => {
+    expect(resolveSwarmModelLabel('Opus 4.8')).toEqual({
+      provider: 'anthropic-oauth',
+      default: 'claude-opus-4-8',
+    })
     expect(resolveSwarmModelLabel('Opus 4.7')).toEqual({
       provider: 'anthropic-oauth',
-      default: 'claude-opus-4-7',
+      default: 'claude-opus-4-8',
     })
     expect(resolveSwarmModelLabel('Claude Opus 4.6')).toEqual({
       provider: 'anthropic-oauth',

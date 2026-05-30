@@ -165,6 +165,7 @@ function colorForWorker(workerId: string) {
 
 function formatAssignedModel(model?: string | null, provider?: string | null): string {
   const value = `${model || ''} ${provider || ''}`.toLowerCase()
+  if (value.includes('claude-opus-4-8') || value.includes('opus-4-8')) return 'Opus 4.8'
   if (value.includes('claude-opus-4-7') || value.includes('opus-4-7')) return 'Opus 4.7'
   if (value.includes('claude-opus-4-6') || value.includes('opus-4-6')) return 'Opus 4.6'
   if (value.includes('gpt-5.5')) return 'GPT-5.5'
@@ -200,7 +201,7 @@ const MODEL_OPTIONS = [
   'GPT-5.5',
   'GPT-5.4',
   'GPT-5.3',
-  'Opus 4.7',
+  'Opus 4.8',
   'Opus 4.6',
   'Opus 4.5',
   'MiniMax',

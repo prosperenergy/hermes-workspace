@@ -246,6 +246,21 @@ const PROVIDER_CARDS: Array<{
   { id: 'custom', name: 'Custom', logo: '', models: [], authType: 'api_key', envKey: 'CUSTOM_API_KEY' },
 ]
 
+function providerMatchesModel(provider: string, model: { id?: string; provider?: string }): boolean {
+  const wanted = provider.toLowerCase()
+  const id = String(model.id || '').toLowerCase()
+  const modelProvider = String(model.provider || '').toLowerCase()
+  if (!wanted) return true
+  if (modelProvider === wanted) return true
+  if (wanted === 'openai') return id.startsWith('gpt-') || id.includes('codex')
+  if (wanted === 'anthropic') return id.includes('claude-')
+  if (wanted === 'xai') return id.startsWith('grok-')
+  if (wanted === 'gemini') return id.startsWith('gemini-') || id.startsWith('gemini-api-')
+  if (wanted === 'vertex') return id.startsWith('vertex/')
+  if (wanted === 'nvidia') return id.startsWith('llama-') || id.startsWith('nemotron-') || id.startsWith('nvidia/')
+  return id.startsWith(`${wanted}-`) || id.includes(`${wanted}/`)
+}
+
 export type ProviderClickAction = 'select' | 'oauth' | 'local' | 'custom' | 'ignore'
 
 export function getProviderClickAction(input: {
@@ -349,12 +364,15 @@ function HermesContent() {
           return
         }
       }
-      fetch(
-        `/api/claude-proxy/api/available-models?provider=${encodeURIComponent(providerId)}`,
-      )
+      fetch('/api/models?refresh=1')
         .then((r) => r.json())
-        .then((d: { models?: Array<{ id: string }> }) => {
-          setAvailableModels((d.models || []).map((m) => m.id))
+        .then((d: { models?: Array<{ id: string; provider?: string }>; data?: Array<{ id: string; provider?: string }> }) => {
+          const models = Array.isArray(d.models) ? d.models : Array.isArray(d.data) ? d.data : []
+          setAvailableModels(
+            models
+              .filter((m) => providerMatchesModel(providerId, m))
+              .map((m) => m.id),
+          )
         })
         .catch(() => {
           // Fall back to hardcoded

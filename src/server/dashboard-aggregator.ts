@@ -967,13 +967,27 @@ function normalizeLogs(
   let warnCount = 0
   for (const line of lines) {
     const lower = line.toLowerCase()
+
+    // Telegram long-poll handoffs often emit a few transient WARNING lines
+    // while the previous getUpdates request expires. They are noisy but not
+    // dashboard-worthy incidents.
     if (
-      /\b(error|exception|traceback|failed|fatal)\b/.test(lower) ||
-      lower.includes('errno')
+      lower.includes('telegram polling conflict') ||
+      lower.includes('terminated by other getupdates request') ||
+      lower.includes('previous session still held open')
     ) {
-      errorCount += 1
-    } else if (/\b(warn|warning|deprecated)\b/.test(lower)) {
+      continue
+    }
+
+    const isWarning = /\b(warn|warning|deprecated)\b/.test(lower)
+    const isError =
+      /\b(error|exception|traceback|failed|fatal|critical)\b/.test(lower) ||
+      lower.includes('errno')
+
+    if (isWarning) {
       warnCount += 1
+    } else if (isError) {
+      errorCount += 1
     }
   }
   return {

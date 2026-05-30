@@ -197,7 +197,7 @@ export const Route = createFileRoute('/api/swarm-decompose')({
         }
         if (workers.length === 0) return json({ error: 'workers[] required' }, { status: 400 })
 
-        const requestedModel = typeof body.model === 'string' && body.model.trim() ? body.model.trim() : (process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-opus-4-7')
+        const requestedModel = typeof body.model === 'string' && body.model.trim() ? body.model.trim() : (process.env.CLAUDE_DEFAULT_MODEL ?? 'claude-opus-4-8')
 
         try {
           const result = await callOrchestrator(prompt, workers, requestedModel)

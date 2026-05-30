@@ -90,6 +90,116 @@ function unavailablePayload(extra: Record<string, unknown> = {}): Response {
   })
 }
 
+type ProsperManagedProvider = {
+  id: string
+  name: string
+  envKey: string
+  marker: string
+  match: (modelId: string) => boolean
+}
+
+const CPAMC_BASE_URL =
+  process.env.CPAMC_BASE_URL?.trim() ||
+  process.env.CLI_PROXY_API_BASE_URL?.trim() ||
+  'http://127.0.0.1:8317/v1'
+const CPAMC_API_KEY = process.env.CPAMC_API_KEY?.trim() || 'prosper-sam-2026'
+
+const PROSPER_MANAGED_PROVIDERS: Array<ProsperManagedProvider> = [
+  {
+    id: 'anthropic',
+    name: 'Anthropic / Claude Max',
+    envKey: 'CPAMC_CLAUDE_OAUTH',
+    marker: 'CPAMC OAuth',
+    match: (modelId) => modelId.includes('claude-'),
+  },
+  {
+    id: 'openai-codex',
+    name: 'OpenAI Codex / ChatGPT',
+    envKey: 'CPAMC_CODEX_OAUTH',
+    marker: 'CPAMC OAuth',
+    match: (modelId) => modelId.startsWith('gpt-') || modelId.includes('codex'),
+  },
+  {
+    id: 'xai',
+    name: 'xAI / Grok',
+    envKey: 'CPAMC_XAI_OAUTH',
+    marker: 'CPAMC OAuth',
+    match: (modelId) => modelId.startsWith('grok-'),
+  },
+  {
+    id: 'gemini-api',
+    name: 'Google Gemini API',
+    envKey: 'GEMINI_API_KEY',
+    marker: 'CPAMC API key',
+    match: (modelId) => modelId.startsWith('gemini-') || modelId.startsWith('gemini-api-'),
+  },
+  {
+    id: 'vertex',
+    name: 'Google Vertex',
+    envKey: 'VERTEX_SERVICE_ACCOUNT',
+    marker: 'CPAMC service account',
+    match: (modelId) => modelId.startsWith('vertex/'),
+  },
+  {
+    id: 'nvidia',
+    name: 'NVIDIA',
+    envKey: 'NVIDIA_API_KEY',
+    marker: 'CPAMC API key',
+    match: (modelId) =>
+      modelId.startsWith('llama-') ||
+      modelId.startsWith('nemotron-') ||
+      modelId.startsWith('nvidia/'),
+  },
+  {
+    id: 'kimi-web',
+    name: 'Kimi WebBridge',
+    envKey: 'KIMI_WEBBRIDGE',
+    marker: 'local web bridge',
+    match: (modelId) => modelId.startsWith('kimi-web-'),
+  },
+]
+
+function readCpamcModelIds(payload: unknown): Array<string> {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return []
+  const record = payload as Record<string, unknown>
+  const raw = Array.isArray(record.data)
+    ? record.data
+    : Array.isArray(record.models)
+      ? record.models
+      : []
+  return raw.flatMap((entry) => {
+    if (typeof entry === 'string') return [entry.trim()].filter(Boolean)
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return []
+    const id = (entry as Record<string, unknown>).id
+    return typeof id === 'string' && id.trim() ? [id.trim()] : []
+  })
+}
+
+async function getCpamcModelIds(): Promise<Array<string>> {
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (CPAMC_API_KEY) headers.Authorization = `Bearer ${CPAMC_API_KEY}`
+  const response = await fetch(`${CPAMC_BASE_URL.replace(/\/+$/, '')}/models`, {
+    headers,
+    signal: AbortSignal.timeout(5_000),
+  })
+  if (!response.ok) return []
+  return readCpamcModelIds(await response.json())
+}
+
+async function getKimiWebBridgeConnected(): Promise<boolean> {
+  const response = await fetch('http://127.0.0.1:10086/status', {
+    signal: AbortSignal.timeout(2_000),
+  })
+  if (!response.ok) return false
+  const payload = await response.json()
+  return Boolean(
+    payload &&
+      typeof payload === 'object' &&
+      !Array.isArray(payload) &&
+      (payload as Record<string, unknown>).extension_connected === true,
+  )
+}
+
 export async function handleHermesConfigGet({
   request,
 }: {
@@ -114,6 +224,39 @@ export async function handleHermesConfigGet({
     localModels: getDiscoveredModels(),
   })
 
+  const cpamcModelIds = await getCpamcModelIds().catch(() => [])
+  const kimiConnected = await getKimiWebBridgeConnected().catch(() => false)
+  const managedProviders = PROSPER_MANAGED_PROVIDERS.map((provider) => {
+    const models = cpamcModelIds.filter((modelId) => provider.match(modelId))
+    const configured = models.length > 0
+    const available =
+      provider.id === 'kimi-web' ? configured && kimiConnected : configured
+    const marker =
+      provider.id === 'kimi-web' && configured && !kimiConnected
+        ? 'extension disconnected'
+        : provider.marker
+    return {
+      id: provider.id,
+      name: provider.name,
+      kind: 'api_key',
+      configured,
+      authenticated: configured,
+      available,
+      isDefault: state.activeProvider === provider.id,
+      authSource: configured ? 'config' : 'none',
+      envKeys: [provider.envKey],
+      maskedCredentials: {
+        [provider.envKey]: configured ? marker : '',
+      },
+      maskedKeys: {
+        [provider.envKey]: configured ? marker : '',
+      },
+      models: models.map((id) => ({ id, name: id })),
+      warnings: configured ? [] : ['No matching CPAMC model is visible right now.'],
+      prosperManaged: true,
+    }
+  })
+
   // Legacy /api/claude-config consumers read provider.maskedKeys; alias it.
   const providers = state.providers.map((p) => ({
     ...p,
@@ -122,7 +265,13 @@ export async function handleHermesConfigGet({
 
   return Response.json({
     ...state,
-    providers,
+    providers: [
+      ...managedProviders,
+      ...providers.filter(
+        (provider) =>
+          !PROSPER_MANAGED_PROVIDERS.some((managed) => managed.id === provider.id),
+      ),
+    ],
     claudeHome: paths.hermesHome,
   })
 }

@@ -986,6 +986,9 @@ type ClaudeProvider = {
   envKeys: Array<string>
   configured: boolean
   maskedKeys: Record<string, string>
+  authSource?: string
+  available?: boolean
+  prosperManaged?: boolean
 }
 
 type ClaudeConfigData = {
@@ -1005,6 +1008,21 @@ type AvailableModelsResponse = {
   provider: string
   models: Array<{ id: string; description: string }>
   providers: Array<{ id: string; label: string; authenticated: boolean }>
+}
+
+function providerMatchesModel(provider: string, model: { id?: string; provider?: string }): boolean {
+  const wanted = provider.toLowerCase()
+  const id = String(model.id || '').toLowerCase()
+  const modelProvider = String(model.provider || '').toLowerCase()
+  if (!wanted) return true
+  if (modelProvider === wanted) return true
+  if (wanted === 'openai') return id.startsWith('gpt-') || id.includes('codex')
+  if (wanted === 'anthropic') return id.includes('claude-')
+  if (wanted === 'xai') return id.startsWith('grok-')
+  if (wanted === 'gemini') return id.startsWith('gemini-') || id.startsWith('gemini-api-')
+  if (wanted === 'vertex') return id.startsWith('vertex/')
+  if (wanted === 'nvidia') return id.startsWith('llama-') || id.startsWith('nemotron-') || id.startsWith('nvidia/')
+  return id.startsWith(`${wanted}-`) || id.includes(`${wanted}/`)
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -1242,13 +1260,34 @@ function ClaudeConfigSection({
     }
     setLoadingModels(true)
     try {
-      const res = await fetch(
-        `/api/claude-proxy/api/available-models?provider=${encodeURIComponent(provider)}`,
-      )
+      const res = await fetch('/api/models?refresh=1')
       if (res.ok) {
-        const result = (await res.json()) as AvailableModelsResponse
-        setAvailableModels(result.models)
-        if (result.providers.length > 0) setAvailableProviders(result.providers)
+        const result = (await res.json()) as AvailableModelsResponse & {
+          models?: Array<{ id: string; name?: string; provider?: string }>
+          data?: Array<{ id: string; name?: string; provider?: string }>
+          configuredProviders?: Array<string>
+        }
+        const rawModels = Array.isArray(result.models)
+          ? result.models
+          : Array.isArray(result.data)
+            ? result.data
+            : []
+        setAvailableModels(
+          rawModels
+            .filter((model) => providerMatchesModel(provider, model))
+            .map((model) => ({ id: model.id, description: model.name || model.id })),
+        )
+        if (Array.isArray(result.configuredProviders) && result.configuredProviders.length > 0) {
+          setAvailableProviders(
+            result.configuredProviders.map((id) => ({
+              id,
+              label: id,
+              authenticated: true,
+            })),
+          )
+        } else if (Array.isArray(result.providers) && result.providers.length > 0) {
+          setAvailableProviders(result.providers)
+        }
       }
     } catch {
       // ignore
@@ -1599,8 +1638,8 @@ function ClaudeConfigSection({
                 Fallback model (optional)
               </p>
               <p className="text-xs text-primary-600">
-                Used only if the primary model fails. Keep empty to disable — avoids mixing this
-                up with your main provider (for example OpenRouter only here, local primary above).
+                Used only if the primary model fails. Keep empty to disable so the main provider
+                stays clear.
               </p>
             </div>
             <Button
@@ -1623,7 +1662,7 @@ function ClaudeConfigSection({
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setFallbackProviderInput(e.target.value)
                     }
-                    placeholder="e.g. openrouter"
+                    placeholder="e.g. anthropic"
                     className="font-mono text-sm"
                   />
                 </label>
@@ -1687,17 +1726,21 @@ function ClaudeConfigSection({
 
       <SettingsSection
         title="API Keys"
-        description="Manage provider API keys stored in ~/.hermes/.env"
+        description="Real provider lanes Hermes uses through CPAMC and ~/.hermes/.env"
         icon={CloudIcon}
       >
         {data.providers
-          .filter((p) => p.envKeys.length > 0 && p.id !== 'custom')
+          .filter((p) => p.envKeys.length > 0 && p.id !== 'custom' && (p.prosperManaged || p.configured))
           .map((provider) => (
             <SettingsRow
               key={provider.id}
               label={provider.name}
               description={
-                provider.configured ? '✅ Configured' : '❌ Not configured'
+                provider.configured
+                  ? provider.available === false
+                    ? 'Configured · needs attention'
+                    : 'Configured'
+                  : 'Not configured'
               }
             >
               <div className="flex w-full max-w-sm items-center gap-2">
@@ -1743,16 +1786,27 @@ function ClaudeConfigSection({
                         >
                           {provider.maskedKeys[envKey] || 'Not set'}
                         </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            setEditingKey(envKey)
-                            setKeyInput('')
-                          }}
-                        >
-                          {provider.configured ? 'Change' : 'Add'}
-                        </Button>
+                        {provider.prosperManaged ? (
+                          <span className={cn(
+                            'rounded-full border px-2 py-1 text-[11px] font-medium',
+                            provider.available === false
+                              ? 'border-amber-300 bg-amber-50 text-amber-700'
+                              : 'border-primary-200 text-primary-700',
+                          )}>
+                            {provider.available === false ? 'Needs browser' : 'Live'}
+                          </span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingKey(envKey)
+                              setKeyInput('')
+                            }}
+                          >
+                            {provider.configured ? 'Change' : 'Add'}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
