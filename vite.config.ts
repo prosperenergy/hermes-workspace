@@ -427,6 +427,7 @@ const config = defineConfig(({ mode, command }) => {
       exclude: [
         '**/node_modules/**',
         '**/dist/**',
+        '**/e2e/**',
         '**/skills-bundle/**',
         '**/.{idea,git,cache,output,temp}/**',
       ],
@@ -434,13 +435,15 @@ const config = defineConfig(({ mode, command }) => {
       // `import` and CJS `require('react')` share a single module instance.
       // Without this, react-dom sets the dispatcher on its CJS React copy while
       // components call hooks on the ESM React copy → null dispatcher → crash.
-      deps: {
-        inline: [
-          'react',
-          'react-dom',
-          '@testing-library/react',
-          '@testing-library/dom',
-        ],
+      server: {
+        deps: {
+          inline: [
+            'react',
+            'react-dom',
+            '@testing-library/react',
+            '@testing-library/dom',
+          ],
+        },
       },
     },
     define: {

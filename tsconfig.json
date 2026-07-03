@@ -6,6 +6,10 @@
     "prettier.config.js",
     "vite.config.ts"
   ],
+  "exclude": [
+    "e2e/**",
+    "playground-ws-worker/**"
+  ],
 
   "compilerOptions": {
     "target": "ES2022",

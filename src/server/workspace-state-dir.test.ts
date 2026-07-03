@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { getStateDir } from './workspace-state-dir'
 
 describe('getStateDir', () => {
@@ -22,23 +22,23 @@ describe('getStateDir', () => {
     expect(result).toBe('/custom/state/dir')
   })
 
-  it('uses HERMES_HOME/workspace when HERMES_WORKSPACE_STATE_DIR is not set', () => {
+  it('uses HERMES_HOME directly when HERMES_WORKSPACE_STATE_DIR is not set', () => {
     process.env.HERMES_HOME = '/custom/hermes'
     const result = getStateDir()
-    expect(result).toBe('/custom/hermes/workspace')
+    expect(result).toBe('/custom/hermes')
   })
 
-  it('falls back to CLAUDE_HOME/workspace when only CLAUDE_HOME is set', () => {
+  it('falls back to CLAUDE_HOME directly when only CLAUDE_HOME is set', () => {
     process.env.CLAUDE_HOME = '/claude/home'
     const result = getStateDir()
-    expect(result).toBe('/claude/home/workspace')
+    expect(result).toBe('/claude/home')
   })
 
   it('prefers HERMES_HOME over CLAUDE_HOME', () => {
     process.env.HERMES_HOME = '/hermes/home'
     process.env.CLAUDE_HOME = '/claude/home'
     const result = getStateDir()
-    expect(result).toBe('/hermes/home/workspace')
+    expect(result).toBe('/hermes/home')
   })
 
   it('prefers HERMES_WORKSPACE_STATE_DIR over everything', () => {

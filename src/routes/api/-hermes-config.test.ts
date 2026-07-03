@@ -49,7 +49,7 @@ afterEach(() => {
 
 async function loadHandlers(modulePath: string) {
   const mod = await import(modulePath)
-  return (mod as any).Route.server.handlers
+  return mod.Route.server.handlers
 }
 
 describe('canonical /api/hermes-config route', () => {
@@ -149,21 +149,32 @@ describe('canonical /api/hermes-config route', () => {
 })
 
 describe('legacy /api/claude-config alias', () => {
-  it('GET aliases provider.maskedCredentials to provider.maskedKeys for the legacy /settings page', async () => {
+  it('GET reuses the canonical provider payload for the legacy /settings page', async () => {
+    fs.writeFileSync(
+      path.join(tmpHome, 'config.yaml'),
+      'provider: openrouter\nmodel: auto\n',
+      'utf-8',
+    )
     fs.writeFileSync(
       path.join(tmpHome, '.env'),
       'OPENROUTER_API_KEY=sk-test-1234\n',
       'utf-8',
     )
 
-    const handlers = await loadHandlers('./claude-config')
-    const res = await handlers.GET({
+    const legacyHandlers = await loadHandlers('./claude-config')
+    const canonicalHandlers = await loadHandlers('./hermes-config')
+
+    const res = await legacyHandlers.GET({
       request: new Request('http://localhost/api/claude-config'),
     })
-    const body = await res.json()
-    const openrouter = body.providers.find((p: any) => p.id === 'openrouter')
+    const canonicalRes = await canonicalHandlers.GET({
+      request: new Request('http://localhost/api/hermes-config'),
+    })
 
-    expect(openrouter.maskedKeys).toEqual(openrouter.maskedCredentials)
-    expect(openrouter.maskedKeys.OPENROUTER_API_KEY).toBeTruthy()
+    const body = await res.json()
+    const canonicalBody = await canonicalRes.json()
+
+    expect(body.providers).toEqual(canonicalBody.providers)
+    expect(body.claudeHome).toBe(canonicalBody.claudeHome)
   })
 })
