@@ -21,9 +21,8 @@ describe('ChatComposer context controls', () => {
     const src = source()
 
     expect(src).toContain("fetch('/api/workspace')")
-    expect(src).toContain('Workspace context')
+    expect(src).toContain('<ContextBar compact sessionId={sessionKey} />')
     expect(src).toContain('workspaceSelectMutation')
-    expect(src).toContain('workspaceEntries.map')
     expect(src).toContain('SEARCH_MODAL_EVENTS.TOGGLE_FILE_EXPLORER')
     expect(src).toContain('Reasoning effort')
     expect(src).toContain("['medium', 'Medium']")

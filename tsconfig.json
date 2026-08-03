@@ -6,6 +6,10 @@
     "prettier.config.js",
     "vite.config.ts"
   ],
+  "exclude": [
+    "e2e/**",
+    "playground-ws-worker/**"
+  ],
 
   "compilerOptions": {
     "target": "ES2022",
@@ -14,13 +18,10 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
 
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": false,
     "noEmit": true,
-
-    /* Linting */
     "skipLibCheck": true,
     "strict": true,
     "noUnusedLocals": false,

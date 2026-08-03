@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
  *
  * Priority:
  * 1. `HERMES_WORKSPACE_STATE_DIR` env var (explicit override)
- * 2. `join(HERMES_HOME, 'workspace')` where HERMES_HOME respects
+ * 2. `HERMES_HOME` directly, where HERMES_HOME respects
  *    `HERMES_HOME` → `CLAUDE_HOME` → `~/.hermes` (standard chain)
  *
  * The returned path is absolute and resolved. Callers should create the
@@ -21,5 +21,5 @@ export function getStateDir(): string {
     process.env.CLAUDE_HOME?.trim() ??
     join(homedir(), '.hermes')
 
-  return resolve(join(hermesHome, 'workspace'))
+  return resolve(hermesHome)
 }

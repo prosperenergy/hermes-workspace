@@ -20,6 +20,7 @@
     "prosper:worker:once": "node scripts/prosper-os-redis-worker.mjs --once",
     "playground:ws": "node scripts/playground-ws.mjs",
     "lint": "eslint",
+    "typecheck": "pnpm exec tsc --noEmit",
     "format": "prettier",
     "check": "prettier --write . && eslint --fix",
     "electron:dev": "NODE_ENV=development electron .",
